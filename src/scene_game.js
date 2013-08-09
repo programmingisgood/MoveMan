@@ -1,6 +1,6 @@
 
-var gameGraphics = [ "assets/moveman.png", "assets/tile_blank.png", "assets/tile_start.png" ];
-var tileGraphics = { B: "assets/tile_blank.png", S: "assets/tile_start.png", A: "assets/tile_start.png" };
+var gameGraphics = [ "assets/moveman.png", "assets/tile_blank.png", "assets/tile_start.png", "assets/tile_arrow.png" ];
+var tileGraphics = { B: "assets/tile_blank.png", S: "assets/tile_start.png", A: "assets/tile_arrow.png" };
 
 var kTileLogics = { }
 kTileLogics.A = {
@@ -13,6 +13,42 @@ kTileLogics.A = {
         }
     } };
 
+function InitArrow(tile)
+{
+    tile.dirX = 0;
+    tile.dirY = 0;
+    var dirArray = [ "left", "right", "up", "down" ];
+
+    tile.setDir = function(dirString)
+    {
+        if (dirString == "left")
+        {
+            this.dirX = -1;
+            this.dirY = 0;
+            this.rotation = -90;
+        }
+        else if (dirString == "right")
+        {
+            this.dirX = 1;
+            this.dirY = 0;
+            this.rotation = 90;
+        }
+        else if (dirString == "up")
+        {
+            this.dirX = 0;
+            this.dirY = -1;
+            this.rotation = 0;
+        }
+        else if (dirString == "down")
+        {
+            this.dirX = 0;
+            this.dirY = 1;
+            this.rotation = 180;
+        }
+    }
+    tile.setDir(dirArray[Math.floor(Math.random() * dirArray.length)])
+}
+
 levels = new Array();
 
 var kMovemanWidth = 16;
@@ -20,10 +56,15 @@ var kMovemanHeight = 32;
 var kTileWidth = 32;
 var kTileHeight = 32;
 
+function GetTile(level, tileX, tileY)
+{
+    return level.tiles[tileY * level.height + tileX];
+}
+
 function GetTileAt(level, x, y)
 {
-    var atTileX = Math.floor(x / kTileWidth);
-    var atTileY = Math.floor(y / kTileHeight);
+    var atTileX = Math.floor((x - level.offsetX) / kTileWidth);
+    var atTileY = Math.floor((y - level.offsetY) / kTileHeight);
     var numDown = level.height;
     return level.tiles[numDown * atTileY + atTileX];
 }
@@ -32,8 +73,11 @@ function LoadLevel(level, moveman)
 {
     var width = level.width;
     var height = level.height;
-    var x = 0;
-    var y = 0;
+    var offsetX = Game.width() / 2 - width * kTileWidth / 2;
+    var offsetY = Game.height() / 2 - height * kTileHeight / 2;
+    var x = offsetX;
+    var y = offsetY;
+    moveman.grid(offsetX, offsetY, level.width, level.height, kTileWidth, kTileHeight);
     var tiles = new Array();
     for (var t = 0; t < level.tiles.length; t++)
     {
@@ -41,44 +85,35 @@ function LoadLevel(level, moveman)
         var tile = Crafty.e("2D, Canvas, Image")
                    .attr({ x: x, y: y, z: 0, w: kTileWidth, h: kTileHeight })
                    .image(tileGraphics[tileType])
+                   .origin("center");
 
         tile.logic = kTileLogics[tileType];
         if (tileType == "S")
         {
-            moveman.attr({ x: x + moveman.w / 2, y: y - kTileHeight / 2 });
+            moveman.setGridPos(t % width, Math.floor(t / width));
         }
         else if (tileType == "A")
         {
-            tile.dirX = 0;
-            tile.dirY = 0;
-            var leftRight = Math.random() > 0.5;
-            if (leftRight)
-            {
-                var left = Math.random() > 0.5;
-                if (left)
-                    tile.dirX = -1
-                else
-                    tile.dirX = 1;
-            }
-            else
-            {
-                var up = Math.random() > 0.5;
-                if (up)
-                    tile.dirY = 1;
-                else
-                    tile.dirY = -1;
-            }
+            InitArrow(tile);
         }
 
         x += kTileWidth;
         if (t > 0 && (t + 1) % width == 0)
         {
-            x = 0;
+            x = offsetX;
             y += kTileHeight;
         }
         tiles.push(tile);
     }
-    return { width: level.width, height: level.height, tiles: tiles };
+    return { width: level.width, height: level.height, offsetX: offsetX, offsetY: offsetY, tiles: tiles };
+}
+
+function GenerateCoordLabels(level)
+{
+    Crafty.e("2D, Canvas, Text")
+    .attr({ x: 100, y: 100 })
+    .text("A")
+    .textColor('#FFFFFF');
 }
 
 Crafty.scene('Game', function()
@@ -91,11 +126,11 @@ Crafty.scene('Game', function()
 
     Crafty.sprite("assets/moveman.png", { moveman: [ 0, 0, 64, 32 ] } );
 
-    var moveman = Crafty.e("2D, Canvas, Collision, Delay, moveman")
+    var moveman = Crafty.e("2D, Canvas, Collision, Delay, Grid, moveman")
                   .attr({ x: Game.width() / 2, y: Game.height() / 2, z: 1, w: kMovemanWidth, h: kMovemanHeight })
                   .collision();
 
-    moveman.sprite(0, 0, 16, 32);
+    moveman.sprite(0, 0, kMovemanWidth, kMovemanHeight);
     moveman.dirX = 1;
     moveman.dirY = 0;
 
@@ -114,12 +149,11 @@ Crafty.scene('Game', function()
 
     moveman.delay(function()
         {
-            var x = kTileWidth * this.dirX;
-            var y = kTileHeight * this.dirY;
-            this.shift(x, y);
-            var translatedX = this.x - this.w / 2;
-            var translatedY = this.y + kTileHeight / 2; 
-            var enterTile = GetTileAt(currentLevel, translatedX, translatedY);
+            var gridPos = this.getGridPos();
+            gridPos.x += this.dirX;
+            gridPos.y += this.dirY;
+            this.setGridPos(gridPos.x, gridPos.y);
+            var enterTile = GetTile(currentLevel, gridPos.x, gridPos.y);
             if (enterTile && enterTile.logic)
             {
                 enterTile.logic.OnEnter(enterTile, this);
@@ -127,4 +161,5 @@ Crafty.scene('Game', function()
         }, 1000, -1);
 
     currentLevel = LoadLevel(levels[0], moveman);
+    GenerateCoordLabels(currentLevel);
 });

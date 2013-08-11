@@ -39,3 +39,31 @@ Crafty.c("Grid",
         return new Crafty.math.Vector2D(this.gridX, this.gridY);
     }
 });
+
+Crafty.c("TextEntry",
+{
+    init: function()
+    {
+        this.requires("Text");
+
+        this.bind("KeyDown", this._keydown);
+        this.textEntryData = "";
+    },
+
+    _keydown: function(e)
+    {
+        var code = e.keyCode;
+        if (code == Crafty.keys.BACKSPACE)
+        {
+            //this.textEntryData
+        }
+        else if (code == Crafty.keys.ENTER)
+        {
+            this.trigger("OnTextEntered", this.textEntryData);
+            this.textEntryData = "";
+            return;
+        }
+        this.textEntryData += String.fromCharCode(code);
+        this.text(this.textEntryData);
+    }
+})

@@ -105,15 +105,40 @@ function LoadLevel(level, moveman)
         }
         tiles.push(tile);
     }
-    return { width: level.width, height: level.height, offsetX: offsetX, offsetY: offsetY, tiles: tiles };
+    return { width: level.width, height: level.height,
+             offsetX: offsetX, offsetY: offsetY, tiles: tiles,
+             tileWidth: kTileWidth, tileHeight: kTileHeight };
 }
 
 function GenerateCoordLabels(level)
 {
-    Crafty.e("2D, Canvas, Text")
-    .attr({ x: 100, y: 100 })
-    .text("A")
-    .textColor('#FFFFFF');
+    level.labels = new Array();
+    var x = level.offsetX;
+    var y = level.offsetY;
+
+    var characters = [ "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P" ];
+    for (var i = 0; i < level.width; i++)
+    {
+        var label = Crafty.e("2D, Canvas, Text")
+                    .attr({ x: x + kTileWidth / 2, y: y - 4 })
+                    .text(characters[i])
+                    .textColor('#FFFFFF');
+        level.labels.push(label);
+        x += kTileWidth;
+    }
+
+    x = level.offsetX;
+    var number = 1;
+    for (var i = 0; i < level.height; i++)
+    {
+        var label = Crafty.e("2D, Canvas, Text")
+                    .attr({ x: x - 10, y: y + kTileHeight / 2 })
+                    .text(number)
+                    .textColor('#FFFFFF');
+        level.labels.push(label);
+        y += kTileHeight;
+        number++;
+    }
 }
 
 Crafty.scene('Game', function()
@@ -123,6 +148,7 @@ Crafty.scene('Game', function()
     Crafty.load(gameGraphics);
 
     var currentLevel = null;
+    var uiElements = null;
 
     Crafty.sprite("assets/moveman.png", { moveman: [ 0, 0, 64, 32 ] } );
 
@@ -162,4 +188,5 @@ Crafty.scene('Game', function()
 
     currentLevel = LoadLevel(levels[0], moveman);
     GenerateCoordLabels(currentLevel);
+    uiElements = InitUI(currentLevel);
 });

@@ -55,15 +55,17 @@ Crafty.c("TextEntry",
         var code = e.keyCode;
         if (code == Crafty.keys.BACKSPACE)
         {
-            //this.textEntryData
+            this.textEntryData.substring(0, this.textEntryData.length - 1);
         }
         else if (code == Crafty.keys.ENTER)
         {
             this.trigger("OnTextEntered", this.textEntryData);
             this.textEntryData = "";
-            return;
         }
-        this.textEntryData += String.fromCharCode(code);
+        else
+        {
+            this.textEntryData += String.fromCharCode(code);
+        }
         this.text(this.textEntryData);
     }
 })

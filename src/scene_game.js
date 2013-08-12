@@ -1,15 +1,51 @@
 
-var gameGraphics = [ "assets/moveman.png", "assets/tile_blank.png", "assets/tile_start.png", "assets/tile_arrow.png" ];
-var tileGraphics = { B: "assets/tile_blank.png", S: "assets/tile_start.png", A: "assets/tile_arrow.png" };
+var gameGraphics = [ "assets/moveman.png", "assets/tile_blank.png", "assets/tile_start.png", "assets/tile_arrow.png", "assets/tile_exit.png",
+                     "assets/spider.png" ];
+var tileGraphics = { B: "assets/tile_blank.png", S: "assets/tile_start.png", A: "assets/tile_arrow.png", E: "assets/tile_exit.png" };
 
 var kTileLogics = { }
 kTileLogics.A = {
-    OnEnter: function(tile, ent) {
-
+    OnEnter: function(level, tile, ent) {
         if (ent.has("moveman"))
         {
-            ent.dirX = tile.dirX;
-            ent.dirY = tile.dirY;
+            ent.SetDir(tile.dirX, tile.dirY);
+        }
+    },
+    OnCommand: function(level, tile, command) {
+        if (command == "left")
+        {
+            tile.dirX = -1;
+            tile.dirY = 0;
+            tile.rotation = -90;
+        }
+        else if (command == "right")
+        {
+            tile.dirX = 1;
+            tile.dirY = 0;
+            tile.rotation = 90;
+        }
+        else if (command == "up")
+        {
+            tile.dirX = 0;
+            tile.dirY = -1;
+            tile.rotation = 0;
+        }
+        else if (command == "down")
+        {
+            tile.dirX = 0;
+            tile.dirY = 1;
+            tile.rotation = 180;
+        }
+    },
+    OnHints: function(level, tile) {
+        return "up, down, left, right";
+    } };
+
+kTileLogics.E = {
+    OnEnter: function(level, tile, ent) {
+        if (ent.has("moveman"))
+        {
+            LoadLevel(level.index + 1);
         }
     } };
 
@@ -56,9 +92,9 @@ var kMovemanHeight = 32;
 var kTileWidth = 32;
 var kTileHeight = 32;
 
-function GetTile(level, tileX, tileY)
+function GetTile(tileX, tileY)
 {
-    return level.tiles[tileY * level.height + tileX];
+    return this.tiles[tileY * this.height + tileX];
 }
 
 function GetTileAt(level, x, y)
@@ -69,7 +105,7 @@ function GetTileAt(level, x, y)
     return level.tiles[numDown * atTileY + atTileX];
 }
 
-function LoadLevel(level, moveman)
+function ParseLevel(level, moveman)
 {
     var width = level.width;
     var height = level.height;
@@ -82,15 +118,17 @@ function LoadLevel(level, moveman)
     for (var t = 0; t < level.tiles.length; t++)
     {
         var tileType = level.tiles[t];
-        var tile = Crafty.e("2D, Canvas, Image")
+        var tile = Crafty.e("2D, Canvas, Image, Tint")
                    .attr({ x: x, y: y, z: 0, w: kTileWidth, h: kTileHeight })
                    .image(tileGraphics[tileType])
                    .origin("center");
 
         tile.logic = kTileLogics[tileType];
+        tile.gridX = t % width;
+        tile.gridY = Math.floor(t / width);
         if (tileType == "S")
         {
-            moveman.setGridPos(t % width, Math.floor(t / width));
+            moveman.setGridPos(tile.gridX, tile.gridY);
         }
         else if (tileType == "A")
         {
@@ -107,7 +145,97 @@ function LoadLevel(level, moveman)
     }
     return { width: level.width, height: level.height,
              offsetX: offsetX, offsetY: offsetY, tiles: tiles,
-             tileWidth: kTileWidth, tileHeight: kTileHeight };
+             tileWidth: kTileWidth, tileHeight: kTileHeight,
+             GetTile: GetTile };
+}
+
+function SpawnEntities(ents, level)
+{
+    /*for (var e = 0; e < ents.length; e++)
+    {
+        var entData = ents[e];
+        var ent = Crafty.e("2D, Canvas, Delay, Grid, Image")
+                           .attr({ x: 0, y: 0, z: 1 })
+                           .image("assets/" + entData.type + ".png");
+
+        ent.grid(level.offsetX, level.offsetY, level.width, level.height, kTileWidth, kTileHeight)
+        ent.setGridPos(entData.x, entData.y);
+    }*/
+}
+
+function LoadLevel(levelIndex)
+{
+    var ents = Crafty("*");
+    for (var i = 0; i < ents.length; i++)
+    {
+        Crafty(ents[i]).destroy();
+    }
+
+    var currentLevel = null;
+
+    var moveman = Crafty.e("2D, Canvas, Collision, Delay, Grid, moveman")
+                  .attr({ x: Game.width() / 2, y: Game.height() / 2, z: 1, w: kMovemanWidth, h: kMovemanHeight })
+                  .collision();
+
+    moveman.SetDir = function(dirX, dirY)
+    {
+        if (dirY == 1)
+        {
+            this.sprite(0, 0, kMovemanWidth, kMovemanHeight);
+        }
+        else if (dirY == -1)
+        {
+            this.sprite(kMovemanWidth, 0, kMovemanWidth, kMovemanHeight);
+        }
+        else if (dirX == 1)
+        {
+            this.sprite(kMovemanWidth * 2, 0, kMovemanWidth, kMovemanHeight);
+        }
+        else if (dirX == -1)
+        {
+            this.sprite(kMovemanWidth * 3, 0, kMovemanWidth, kMovemanHeight);
+        }
+        this.dirX = dirX;
+        this.dirY = dirY;
+    }
+    moveman.SetDir(1, 0);
+
+    moveman.bind("EnterFrame",
+        function()
+        {
+            var gridPos = this.getGridPos();
+            if (gridPos.x < 0 || gridPos.x >= currentLevel.width)
+            {
+                LoadLevel(currentLevel.index);
+            }
+            else if (gridPos.y < 0 || gridPos.y >= currentLevel.height)
+            {
+                LoadLevel(currentLevel.index);
+            }
+        });
+
+    moveman.delay(function()
+        {
+            var gridPos = this.getGridPos();
+            gridPos.x += this.dirX;
+            gridPos.y += this.dirY;
+            this.setGridPos(gridPos.x, gridPos.y);
+            var enterTile = currentLevel.GetTile(gridPos.x, gridPos.y);
+            if (enterTile && enterTile.logic)
+            {
+                enterTile.logic.OnEnter(currentLevel, enterTile, this);
+            }
+        }, 2000, -1);
+
+    if (!levels[levelIndex])
+    {
+        levelIndex = 0;
+    }
+    currentLevel = ParseLevel(levels[levelIndex], moveman);
+    SpawnEntities(levels[levelIndex].ents, currentLevel);
+    currentLevel.index = levelIndex;
+    GenerateCoordLabels(currentLevel);
+    InitUI(currentLevel);
 }
 
 function GenerateCoordLabels(level)
@@ -132,7 +260,7 @@ function GenerateCoordLabels(level)
     for (var i = 0; i < level.height; i++)
     {
         var label = Crafty.e("2D, Canvas, Text")
-                    .attr({ x: x - 10, y: y + kTileHeight / 2 })
+                    .attr({ x: x - 14, y: y + kTileHeight / 2 })
                     .text(number)
                     .textColor('#FFFFFF');
         level.labels.push(label);
@@ -145,48 +273,11 @@ Crafty.scene('Game', function()
 {
     Crafty.background("rgb(80, 80, 80)");
 
-    Crafty.load(gameGraphics);
+    Crafty.load(gameGraphics, function() {
 
-    var currentLevel = null;
-    var uiElements = null;
+        Crafty.sprite("assets/moveman.png", { moveman: [ 0, 0, 64, 32 ] } );
 
-    Crafty.sprite("assets/moveman.png", { moveman: [ 0, 0, 64, 32 ] } );
+        LoadLevel(0);
 
-    var moveman = Crafty.e("2D, Canvas, Collision, Delay, Grid, moveman")
-                  .attr({ x: Game.width() / 2, y: Game.height() / 2, z: 1, w: kMovemanWidth, h: kMovemanHeight })
-                  .collision();
-
-    moveman.sprite(0, 0, kMovemanWidth, kMovemanHeight);
-    moveman.dirX = 1;
-    moveman.dirY = 0;
-
-    moveman.bind("EnterFrame",
-        function()
-        {
-            if (this.x < 0)
-            {
-                this.x = 0;
-            }
-            if (this.x > Game.width() - this.w)
-            {
-                this.x = Game.width() - this.w;
-            }
-        });
-
-    moveman.delay(function()
-        {
-            var gridPos = this.getGridPos();
-            gridPos.x += this.dirX;
-            gridPos.y += this.dirY;
-            this.setGridPos(gridPos.x, gridPos.y);
-            var enterTile = GetTile(currentLevel, gridPos.x, gridPos.y);
-            if (enterTile && enterTile.logic)
-            {
-                enterTile.logic.OnEnter(enterTile, this);
-            }
-        }, 1000, -1);
-
-    currentLevel = LoadLevel(levels[0], moveman);
-    GenerateCoordLabels(currentLevel);
-    uiElements = InitUI(currentLevel);
+    });
 });

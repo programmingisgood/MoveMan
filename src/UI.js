@@ -1,25 +1,147 @@
 
+function ParseRow(command)
+{
+    if (command && command.length > 0)
+    {
+        var splitCommand = command.split(" ");
+        var coordStr = splitCommand[0];
+        var row = coordStr.match(/\d+\.?\d*/g);
+        row = parseInt(row);
+        if (row)
+        {
+            return row - 1;
+        }
+    }
+    return undefined;
+}
+
+function ParseCol(command)
+{
+    if (command && command.length > 0)
+    {
+        var splitCommand = command.split(" ");
+        var coordStr = splitCommand[0];
+        var col = coordStr.match(/[A-z]/g);
+        if (col)
+        {
+            col = col[0];
+            col.toLowerCase()
+            col = col.charCodeAt(0) - 97;
+            return col
+        }
+    }
+    return undefined;
+}
+
+function ParseCoord(command)
+{
+    var row = ParseRow(command);
+    var col = ParseCol(command);
+    if (row != undefined && col != undefined)
+    {
+        return { row: row, col: col };
+    }
+    return undefined;
+}
+
+function ParseAction(command)
+{
+    var splitCommand = command.split(" ");
+    return splitCommand[1];
+}
+
+function ProcessCommand(command, level)
+{
+    var coord = ParseCoord(command);
+    var action = ParseAction(command);
+
+    if (coord && action)
+    {
+        var tile = level.GetTile(coord.col, coord.row);
+        if (tile && tile.logic && tile.logic.OnCommand)
+        {
+            tile.logic.OnCommand(level, tile, action);
+        }
+    }
+}
+
+function ClearRowColHighlights(level)
+{
+    for (var i = 0; i < level.tiles.length; i++)
+    {
+        level.tiles[i].tint("#000000", 0.0);
+    }
+}
+
+function SyntaxHighlight(command, level)
+{
+    ClearRowColHighlights(level);
+
+    var row = ParseRow(command);
+    for (var i = 0; i < level.tiles.length; i++)
+    {
+        var tile = level.tiles[i];
+        if (tile.gridY == row)
+        {
+            level.tiles[i].tint("#00FF00", 0.5);
+        }
+    }
+
+    var col = ParseCol(command);
+    for (var i = 0; i < level.tiles.length; i++)
+    {
+        var tile = level.tiles[i];
+        if (tile.gridX == col)
+        {
+            level.tiles[i].tint("#00FF00", 0.5);
+        }
+    }
+
+    if (row != undefined && col != undefined)
+    {
+        var tile = level.GetTile(col, row);
+        if (tile && tile.logic && tile.logic.OnHints)
+        {
+            var hints = tile.logic.OnHints(level, tile);
+            $("#hints").val(hints);
+        }
+    }
+}
+
 function InitUI(level)
 {
-	var offsetX = level.offsetX;
-	var offsetY = level.offsetY;
-	var width = level.width * level.tileWidth;
-	var height = level.height * level.tileHeight;
+    $("#commands").focus(function()
+    {
+        if ($(this).val() == $(this).attr("title"))
+        {
+            $(this).val("");
+        }
+    }).blur(function()
+    {
+        if ($(this).val() == "")
+        {
+            $(this).val($(this).attr("title"));
+        }
+    });
 
-	var elements = { };
+    $("#commands").unbind("keyup");
+    $("#commands").keyup(function(e)
+    {
+        if (e.keyCode == 13)
+        {
+            ProcessCommand($("#commands").val(), level);
+            $("#commands").val("");
+            $("#hints").val("");
+            ClearRowColHighlights(level);
+        }
+        else
+        {
+            $("#hints").val("");
+            SyntaxHighlight($("#commands").val(), level);
+        }
+    });
 
-	var x = offsetX;
-	var y = offsetY + height + 4;
-	var commandBox = Crafty.e("2D, Canvas, Color")
-                    .attr({ x: x, y: y, z: 0, w: width, h: 48 })
-                    .color("DDDDDD");
-    elements.commandBox = commandBox;
+    $("#commands").focus();
 
-    var commandText = Crafty.e("2D, Canvas, Text, TextEntry")
-    				  .attr({ x: x + 10, y: y + 4, z: 1, w: width - 20, h: 40 })
-    				  .text("Start typing...")
-                      .textColor('#555555');
-    elements.commandText = commandText;
-
-	return elements;
+    $("#hints").val("");
 }
